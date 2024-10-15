@@ -12,6 +12,11 @@ let mode = "number"; // mode for displaying the data from the IR sensor
 
 let driving = false;
 
+const BASE_SPEED = 20; // base speed 
+
+const motorA = Motor.M0; // easer typing
+const motorB = Motor.M1; // easer typing
+const motorAB = Motor.M0_M1; // easer typing
 
 
 
@@ -32,15 +37,31 @@ input.onButtonEvent(Button.AB, input.buttonEventClick(), function () {
 
 
 
+// function for driving mechanics
+function drive() {
+    if (ir_sensor_data >= 2) {
+        motors.dualMotorPower(motorB, 100);
+        motors.dualMotorPower(motorA, BASE_SPEED);
+    } else {
+        motors.dualMotorPower(motorA, 100);
+        motors.dualMotorPower(motorB, BASE_SPEED);
+    }
+}
+
+
 
 // mainloop
 basic.forever(function () {
+    
+    // ----------IR-Section----------
     ir_sensor_data_raw = pins.analogReadPin(IR_PIN); // read IR sensor data
 
     ir_sensor_data = 0; // reset simplified data
 
     if (driving) {
         basic.setLedColor(Colors.Green);
+    } else {
+        basic.setLedColor(Colors.Red);
     }
 
     for (let pixel = 0; pixel < 5; pixel++) {
@@ -67,6 +88,14 @@ basic.forever(function () {
 
     if (mode == "number") {
         basic.showNumber(ir_sensor_data);
+    }
+
+
+    // ----------Motor-Section----------
+    if (driving) {
+        drive();
+    } else {
+        motors.dualMotorPower(motorAB, 0)
     }
 
     basic.pause(1);
