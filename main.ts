@@ -1,45 +1,24 @@
 const IR_PIN = AnalogPin.C17; // const for the PIN
+const motorA = Motor.M0; // easier typing
+const motorB = Motor.M1; // easier typing
+const motorAB = Motor.M0_M1; // easier typing
+
+const BASE_SPEED = 50; // base speed 
+const max_ir_value = 1010; // my max value
+const leds_in_row = 5;
+const driveThreshold = 300;
+
+let lastVals: number[] = [];
+
+lastVals.fill(0, 0, 4);
 
 let ir_sensor_data_raw = 0;
-let max_ir_value = 1010; // my max value
-const leds_in_row = 5; 
-
-let pixel_step = max_ir_value / leds_in_row;
-
-let ir_sensor_data = 0; // just the simplified data from the IR sensor
-
-let mode = "number"; // mode for displaying the data from the IR sensor
 
 let driving = false;
 
-const BASE_SPEED = 20; // base speed 
-
-const motorA = Motor.M0; // easer typing
-const motorB = Motor.M1; // easer typing
-const motorAB = Motor.M0_M1; // easer typing
-
-
-
-// Button A
-input.onButtonEvent(Button.A, input.buttonEventClick(), function () {
-    mode = "number";
-});
-
-// Button B
-input.onButtonEvent(Button.B, input.buttonEventClick(), function () {
-    mode = "diagramm";
-});
-
-// Button AB
-input.onButtonEvent(Button.AB, input.buttonEventClick(), function () {
-    driving = !driving;
-});
-
-
-
 // function for driving mechanics
-function drive() {
-    if (ir_sensor_data >= 2) {
+function drive(data: number) {
+    if (data >= driveThreshold) {
         motors.dualMotorPower(motorB, 100);
         motors.dualMotorPower(motorA, BASE_SPEED);
     } else {
@@ -48,55 +27,48 @@ function drive() {
     }
 }
 
+// Button B
+input.onButtonEvent(Button.B, input.buttonEventClick(), () => driving = false);
 
+// Button AB
+input.onButtonEvent(Button.AB, input.buttonEventClick(), function () {
+    driving = true;
+
+    while (driving) {
+
+        // ----------IR-Section----------
+        ir_sensor_data_raw = pins.analogReadPin(IR_PIN); // read IR sensor data
+
+        // ----------Motor-Section----------
+        drive(ir_sensor_data_raw);
+
+        basic.pause(1);
+    }
+});
 
 // mainloop
-basic.forever(function () {
-    
-    // ----------IR-Section----------
-    ir_sensor_data_raw = pins.analogReadPin(IR_PIN); // read IR sensor data
-
-    ir_sensor_data = 0; // reset simplified data
-
+basic.forever(() => {
     if (driving) {
         basic.setLedColor(Colors.Green);
     } else {
         basic.setLedColor(Colors.Red);
+        motors.dualMotorPower(motorAB, 0);
     }
 
-    for (let pixel = 0; pixel < 5; pixel++) {
+    for (let j = leds_in_row; j > 0; j--) {
+        lastVals[j] = lastVals[j-1];
+    }
 
-        if (ir_sensor_data_raw > pixel_step * pixel) {
+    lastVals[0] = pins.analogReadPin(IR_PIN);
 
-            if (mode == "diagramm") {
-                for (let i = 0; i < 5; i++) {
-                    led.plot(i, pixel);
-                }
-            }
+    for (let x = 0; x < leds_in_row; x++) {
+        let tmpVal = (lastVals[x] / max_ir_value) * 5;
 
-            ir_sensor_data = pixel;
-
-        } else {
-
-            if (mode == "diagramm") {
-                for (let j = 0; j < 5; j++) {
-                    led.unplot(j, pixel);
-                }
-            }
+        for (let y = 0; y < leds_in_row; y++) {
+            if (y <= tmpVal) led.plot(x, y);
+            else led.unplot(x, y);
         }
     }
 
-    if (mode == "number") {
-        basic.showNumber(ir_sensor_data);
-    }
-
-
-    // ----------Motor-Section----------
-    if (driving) {
-        drive();
-    } else {
-        motors.dualMotorPower(motorAB, 0)
-    }
-
-    basic.pause(1);
+    basic.pause(1000);
 });
